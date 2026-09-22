@@ -77,6 +77,14 @@ function startTikTok() {
       const state = await conn.connect();
       status.tiktok = 'connected'; status.since = Date.now(); status.lastError = null;
       console.log(`[tiktok] connected to @${config.tiktokUsername} (room ${state.roomId})`);
+      try {
+        const info = conn.roomInfo ?? state;
+        const viewers = info?.viewer_count ?? info?.viewerCount ?? info?.stats?.viewer_count ?? info?.stats?.viewerCount ?? 'unknown';
+        const title = info?.title ?? '(no title field)';
+        console.log(`[tiktok] room check - viewers: ${viewers}, title: ${JSON.stringify(title).slice(0, 80)}`);
+      } catch (e) {
+        console.log('[tiktok] room check failed:', e.message);
+      }
     } catch (err) {
       status.tiktok = 'offline'; status.lastError = err?.message ?? String(err);
       console.warn(`[tiktok] connect failed: ${status.lastError} - retrying in 15s`);
