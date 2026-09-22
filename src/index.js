@@ -11,16 +11,29 @@ const links = new Map(); // tiktokId -> { roblox, at }
 const status = { tiktok: config.tiktokUsername ? 'connecting' : 'disabled', since: Date.now(), lastError: null };
 
 // ───────── core handlers (also used by the /test endpoints) ─────────
+const DEBUG = (process.env.DEBUG_CHAT ?? '').trim() === 'true';
+
 async function handleComment(tiktokId, nickname, comment) {
   const raw = extractUsername(comment);
+  if (DEBUG) console.log(`[chat] ${tiktokId}: ${JSON.stringify(comment)} -> ${raw ?? 'IGNORED (did not match comment format)'}`);
   if (!raw) return { ok: false, reason: 'not a username' };
 
   const prev = links.get(tiktokId);
-  if (prev && prev.roblox.toLowerCase() === raw.toLowerCase()) return { ok: false, reason: 'already linked' };
-  if (prev && Date.now() - prev.at < config.joinCooldownMs) return { ok: false, reason: 'cooldown' };
+  if (prev && prev.roblox.toLowerCase() === raw.toLowerCase()) {
+    if (DEBUG) console.log(`[chat] ${tiktokId} already linked to ${raw} - ignoring`);
+    return { ok: false, reason: 'already linked' };
+  }
+  if (prev && Date.now() - prev.at < config.joinCooldownMs) {
+    const wait = Math.ceil((config.joinCooldownMs - (Date.now() - prev.at)) / 1000);
+    if (DEBUG) console.log(`[chat] ${tiktokId} on cooldown for another ${wait}s`);
+    return { ok: false, reason: 'cooldown' };
+  }
 
   const user = await resolveRobloxName(raw);
-  if (!user) return { ok: false, reason: 'no such Roblox user' };
+  if (!user) {
+    if (DEBUG) console.log(`[chat] "${raw}" is not a real Roblox username - ignoring`);
+    return { ok: false, reason: 'no such Roblox user' };
+  }
 
   links.set(tiktokId, { roblox: user.name, at: Date.now() });
   const ev = events.push('join', { roblox: user.name, robloxId: user.id, tiktok: tiktokId, nickname });
@@ -155,5 +168,6 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(config.port, () => {
   console.log(`[http] Runway relay listening on :${config.port}`);
+  console.log(`[config] commentMode=${config.commentMode}` + (config.commentMode === 'prefix' ? ` prefix="${config.commentPrefix}"` : '') + ` validateNames=${config.validateNames} debugChat=${DEBUG}`);
   startTikTok();
 });
