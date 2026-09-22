@@ -1,6 +1,7 @@
 import http from 'node:http';
 import { timingSafeEqual } from 'node:crypto';
 import { TikTokLiveConnection, WebcastEvent, ControlEvent } from 'tiktok-live-connector';
+
 import { config } from './config.js';
 import * as events from './events.js';
 import { extractUsername, giftTier } from './parse.js';
@@ -82,6 +83,13 @@ function startTikTok() {
       retry(15000);
     }
   }
+
+  let rawCount = 0;
+  conn.on(ControlEvent.WEBSOCKET_CONNECTED, () => console.log('[tiktok] websocket connected - raw data should start flowing'));
+  conn.on(ControlEvent.RAW_DATA, () => { rawCount++; });
+  setInterval(() => {
+    if (status.tiktok === 'connected') console.log(`[tiktok] heartbeat: ${rawCount} raw messages received so far`);
+  }, 15000);
 
   conn.on(WebcastEvent.CHAT, (data) => {
     const id = data.user?.uniqueId;
